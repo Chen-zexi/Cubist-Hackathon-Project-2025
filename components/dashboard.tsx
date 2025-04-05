@@ -1,21 +1,30 @@
 "use client";
 
-import {
-  ArrowDownRight, ArrowUpRight, BarChart3, Car, Clock, Eye, EyeOff, Layers, Map, Maximize2,
-  Minimize2
-} from "lucide-react";
-import { ReactNode, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import MapControls from "./map-controls";
-import MultiChart from "./multi-chart";
-import NYCMap from "./nyc-map";
+import { Button } from "@/components/ui/button";
+import {
+  Clock,
+  BarChart3,
+  Map,
+  ArrowUpRight,
+  ArrowDownRight,
+  Car,
+  Maximize2,
+  Minimize2,
+  Layers,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { NYCMap } from "./nyc-map.jsx";
+import TrafficFlowChart from "./traffic-flow-chart";
+import VehicleTypeDistribution from "./vehicle-type-distribution";
 import RevenueMetrics from "./revenue-metrics";
 import TimeSelector from "./time-selector";
-import TrafficFlowChart from "./traffic-flow-chart";
-import VanillaDataView from "./vanilla-data-view";
-import VehicleTypeDistribution from "./vehicle-type-distribution";
+import MapControls from "./map-controls";
+import MultiChart from "./multi-chart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ReactNode } from "react";
 
 // Define interfaces for component props
 interface MetricCardProps {
@@ -43,7 +52,7 @@ export default function Dashboard() {
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Map Background */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <NYCMap view={mapView} />
+        <NYCMap />
       </div>
 
       {/* Map Controls */}
@@ -115,6 +124,8 @@ export default function Dashboard() {
                 </h1>
               </div>
               <div className="flex-1 flex justify-center">
+
+
                 <Tabs
                   value={activeTab}
                   onValueChange={setActiveTab}
