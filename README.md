@@ -24,6 +24,7 @@ A modern React dashboard for visualizing MTA Congestion Relief Zone data with re
 2. Install dependencies: `npm install`
 3. Run the development server: `npm run dev`
 4. Open [http://localhost:5173](http://localhost:5173) in your browser
+5. IMPORTANT: Download the occupancy_analysis.csv file and add it to public/data 
 
 ## Project Structure
 
