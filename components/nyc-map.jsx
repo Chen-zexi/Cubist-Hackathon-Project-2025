@@ -284,10 +284,6 @@ export const NYCMap = ({ showUI }) => {
           this.scene.add(directionalLight2);
 
           const scale = 1;
-          const material = new THREE.MeshStandardMaterial({
-            color: 0x3355ff,
-          });
-
           const height = csvData
             .filter(
               (d) =>
@@ -296,6 +292,19 @@ export const NYCMap = ({ showUI }) => {
             )
             .map((d) => +d["CRZ Entries"])
             .filter((d) => !isNaN(d));
+
+          // Calculate color based on height
+          const maxHeight = 400; // Adjust this value based on your data range
+          const normalizedHeight = Math.min(height / maxHeight, 1);
+          const color = new THREE.Color();
+          // Use power function for more dramatic color change
+          const power = 2; // Higher power = more dramatic change
+          const intensity = Math.pow(normalizedHeight, power);
+          color.setRGB(1, 1 - intensity, 1 - intensity); // Interpolate from white (1,1,1) to red (1,0,0)
+
+          const material = new THREE.MeshStandardMaterial({
+            color: color,
+          });
           const geometry = new THREE.CylinderGeometry(
             200 * scale,
             200 * scale,
