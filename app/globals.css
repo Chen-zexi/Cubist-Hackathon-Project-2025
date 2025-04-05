@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 3%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 3%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 9%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 160 84% 39%;
+  --radius: 0.5rem;
+}
+
+body {
+  @apply bg-black text-white overflow-hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Fade in animation for UI elements */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card {
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+/* Subtle pulse animation for key metrics */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.metric-pulse {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+/* Calendar light theme overrides */
+.calendar-light {
+  --cal-border: rgba(255, 255, 255, 0.2);
+  --cal-text: rgba(255, 255, 255, 0.9);
+  --cal-text-muted: rgba(255, 255, 255, 0.6);
+  --cal-today-bg: rgba(16, 185, 129, 0.1);
+  --cal-today-border: rgba(16, 185, 129, 0.5);
+  --cal-selected-bg: rgb(16, 185, 129);
+  --cal-selected-text: white;
+  --cal-hover-bg: rgba(255, 255, 255, 0.1);
+}
+
+.calendar-light button {
+  color: var(--cal-text) !important;
+}
+
+.calendar-light button:hover:not(:disabled) {
+  background-color: var(--cal-hover-bg) !important;
+}
+
+.calendar-light .rdp-caption_label,
+.calendar-light .rdp-head_cell {
+  color: var(--cal-text) !important;
+  font-weight: 600;
+}
+
+.calendar-light .rdp-day_today {
+  background-color: var(--cal-today-bg) !important;
+  border: 1px solid var(--cal-today-border) !important;
+}
+
+.calendar-light .rdp-day_selected {
+  background-color: var(--cal-selected-bg) !important;
+  color: var(--cal-selected-text) !important;
+}
+
+.calendar-light .rdp-button:hover:not([disabled]) {
+  background-color: var(--cal-hover-bg);
+}
+
+.calendar-light .rdp-nav_button svg {
+  fill: var(--cal-text);
+}
+
+/* Make all popover content text white by default */
+.popover-content {
+  color: white;
+}
+
