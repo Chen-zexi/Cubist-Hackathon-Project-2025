@@ -101,3 +101,4 @@ __pycache__/
 *.tsbuildinfo
 next-env.d.ts
 
+public/data/occupancy_analysis.csv

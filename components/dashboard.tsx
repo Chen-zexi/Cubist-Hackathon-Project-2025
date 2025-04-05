@@ -117,13 +117,15 @@ export default function Dashboard() {
           {/* Header */}
           <header className="bg-black/40 backdrop-blur-md border-b border-gray-800/50 sticky top-0 z-20">
             <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 w-[200px]">
                 <BarChart3 className="h-6 w-6 text-emerald-500" />
                 <h1 className="text-xl font-bold text-white">
                   MTA Congestion Pricing
                 </h1>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex-1 flex justify-center">
+
+
                 <Tabs
                   value={activeTab}
                   onValueChange={setActiveTab}
@@ -142,8 +144,16 @@ export default function Dashboard() {
                     >
                       Real-time Charts
                     </TabsTrigger>
+                    <TabsTrigger
+                      value="data"
+                      className="data-[state=active]:bg-emerald-500/20"
+                    >
+                      Predict Current Traffic
+                    </TabsTrigger>
                   </TabsList>
                 </Tabs>
+              </div>
+              <div className="w-[200px] flex justify-end">
                 <TimeSelector value={timeRange} onChange={setTimeRange} />
               </div>
             </div>
@@ -275,6 +285,19 @@ export default function Dashboard() {
                   </div>
                   <CardContent className="p-4">
                     <MultiChart />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="data">
+                <Card className="bg-black/40 backdrop-blur-md border-gray-800/50 h-[calc(100vh-200px)]">
+                  <div className="p-4 border-b border-gray-800/50">
+                    <h2 className="font-semibold text-white">
+                      Predict Current Traffic
+                    </h2>
+                  </div>
+                  <CardContent className="p-0 h-full">
+                    <VanillaDataView />
                   </CardContent>
                 </Card>
               </TabsContent>
