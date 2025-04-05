@@ -122,11 +122,13 @@ const DateTimeSlider = ({ setDate }) => {
         width: "400px",
         margin: "0 auto",
         position: "absolute",
-        top: "10px",
-        left: "50%",
-        transform: "translateX(-50%)",
+        bottom: "10px",
+        right: "10px",
         zIndex: 2,
-        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        padding: "1rem",
+        borderRadius: "0.5rem",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
       }}
     >
       <input
@@ -136,16 +138,29 @@ const DateTimeSlider = ({ setDate }) => {
         step="1"
         value={step}
         onChange={handleChange}
-        style={{ width: "100%" }}
+        style={{
+          width: "100%",
+          height: "4px",
+          background: "rgba(255, 255, 255, 0.1)",
+          borderRadius: "2px",
+          outline: "none",
+          WebkitAppearance: "none",
+        }}
       />
-      <p style={{ textAlign: "center", marginTop: "10px" }}>
+      <p style={{
+        textAlign: "center",
+        marginTop: "10px",
+        color: "white",
+        fontSize: "0.875rem",
+        fontWeight: "500"
+      }}>
         {formatDate(currentDate)}
       </p>
     </div>
   );
 };
 
-export const NYCMap = () => {
+export const NYCMap = ({ showUI }) => {
   const [csvData, setCsvData] = useState(null);
   const [date, setDate] = useState("03/29/2025 11:50:00 PM");
   useEffect(() => {
@@ -350,19 +365,30 @@ export const NYCMap = () => {
 
   return (
     <div style={{ height: "100vh", width: "100vw" }}>
-      <DateTimeSlider setDate={setDate} />
+      {showUI && <DateTimeSlider setDate={setDate} />}
       <div
         style={{
           position: "absolute",
-          top: 0,
+          bottom: 0,
           left: 0,
           zIndex: 1,
-          backgroundColor: "rgba(255, 255, 255, 0.7)",
-          padding: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          padding: "1rem",
+          borderRadius: "0.5rem",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          margin: "1rem",
+          display: showUI ? "block" : "none",
         }}
       >
         {locations.map((location) => (
-          <div key={location} style={{ padding: "2px" }}>
+          <div key={location} style={{
+            padding: "0.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            color: "white",
+            fontSize: "0.875rem"
+          }}>
             <input
               type="checkbox"
               checked={shown.has(location)}
@@ -384,6 +410,15 @@ export const NYCMap = () => {
                   newShown.delete(location);
                 }
                 setShown(newShown);
+              }}
+              style={{
+                width: "1rem",
+                height: "1rem",
+                borderRadius: "0.25rem",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+                accentColor: "rgb(16, 185, 129)"
               }}
             />
             {location}

@@ -25,6 +25,7 @@ import MapControls from "./map-controls";
 import MultiChart from "./multi-chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReactNode } from "react";
+import VanillaDataView from "./vanilla-data-view";
 
 // Define interfaces for component props
 interface MetricCardProps {
@@ -52,7 +53,7 @@ export default function Dashboard() {
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Map Background */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <NYCMap />
+        <NYCMap showUI={isExpanded}/>
       </div>
 
       {/* Map Controls */}
@@ -68,42 +69,6 @@ export default function Dashboard() {
           ) : (
             <Maximize2 className="h-4 w-4" />
           )}
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          className="bg-black/50 backdrop-blur-sm border-gray-700 hover:bg-black/70"
-          onClick={() => setShowUI(!showUI)}
-        >
-          {showUI ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant={mapView === "3d" ? "default" : "outline"}
-          size="icon"
-          className={
-            mapView !== "3d"
-              ? "bg-black/50 backdrop-blur-sm border-gray-700 hover:bg-black/70"
-              : ""
-          }
-          onClick={() => setMapView("3d")}
-        >
-          <Map className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={mapView === "heatmap" ? "default" : "outline"}
-          size="icon"
-          className={
-            mapView !== "heatmap"
-              ? "bg-black/50 backdrop-blur-sm border-gray-700 hover:bg-black/70"
-              : ""
-          }
-          onClick={() => setMapView("heatmap")}
-        >
-          <Layers className="h-4 w-4" />
         </Button>
       </div>
 
@@ -316,13 +281,6 @@ export default function Dashboard() {
           <Eye className="h-4 w-4 mr-2" />
           Show Dashboard
         </Button>
-      )}
-
-      {/* Map Controls (visible in expanded mode) */}
-      {isExpanded && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
-          <MapControls onViewChange={setMapView} currentView={mapView} />
-        </div>
       )}
 
       {/* Expanded Mode Exit Button */}
