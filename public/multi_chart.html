@@ -154,20 +154,13 @@
     </style>
 </head>
 <body>
-    <button class="close-button" onclick="window.location.href='/'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-        Back to Dashboard
-    </button>
-    
+
     <div class="header-bar">
         <h1>MTA <span class="accent">Congestion Relief Zone</span> - Real-time Charts</h1>
     </div>
-    
+
     <div id="loading" class="loading">Loading charts...</div>
-    
+
     <div class="chart-grid" id="chartGrid"></div>
 
     <script>
@@ -186,38 +179,38 @@
             'Manhattan_Bridge',
             'Hugh_L_Carey_Tunnel'
         ];
-        
+
         // Function to process CSV data
         async function processCSVData(csvText) {
             const rows = csvText.trim().split('\n');
             const headers = rows[0].split(',');
-            
+
             const tollDateIndex = headers.indexOf('Toll Date');
             const crzEntriesIndex = headers.indexOf('CRZ Entries');
-            
+
             if (tollDateIndex === -1 || crzEntriesIndex === -1) {
                 console.error('Missing required columns in CSV');
                 return [];
             }
-            
+
             // Extract rows
             const validRows = rows.slice(1)
                 .map(row => {
                     const columns = row.split(',');
                     if (columns.length <= Math.max(tollDateIndex, crzEntriesIndex)) return null;
-                    
+
                     const crzEntries = parseInt(columns[crzEntriesIndex], 10);
                     if (isNaN(crzEntries) || crzEntries < 0) return null; // Skip negative entries
-                    
+
                     const dateStr = columns[tollDateIndex];
                     const dateParts = dateStr.split('/');
                     if (dateParts.length !== 3) return null;
-                    
+
                     const [month, day, year] = dateParts;
                     // Create a base timestamp for the date
                     const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
                     const timestamp = Math.floor(date.getTime() / 1000);
-                    
+
                     return {
                         timestamp,
                         value: Math.max(0, crzEntries), // Ensure entries are non-negative
@@ -225,13 +218,13 @@
                     };
                 })
                 .filter(r => r !== null);
-            
+
             // Group by date and create multiple entries per day (hourly distribution)
             const ohlcByDate = {};
-            
+
             validRows.forEach(row => {
                 const dateKey = row.timestamp;
-                
+
                 if (!ohlcByDate[dateKey]) {
                     ohlcByDate[dateKey] = {
                         values: [],
@@ -242,16 +235,16 @@
                         date: row.date
                     };
                 }
-                
+
                 ohlcByDate[dateKey].values.push(row.value);
                 ohlcByDate[dateKey].high = Math.max(ohlcByDate[dateKey].high, row.value);
                 ohlcByDate[dateKey].low = Math.min(ohlcByDate[dateKey].low, row.value);
                 ohlcByDate[dateKey].close = row.value; // Last value becomes close
             });
-            
+
             // Expand each day into multiple data points throughout the day
             let chartData = [];
-            
+
             Object.values(ohlcByDate).forEach(dayData => {
                 // Create a base candle for the day
                 const dayCandle = {
@@ -264,27 +257,27 @@
                     timestamp: dayData.date.toLocaleDateString()
                 };
                 chartData.push(dayCandle);
-                
+
                 // Create additional intraday candles for more detailed visualization
                 // Morning, midday, and afternoon sessions (simulated data based on daily value)
                 const baseValue = dayData.open;
                 const range = dayData.high - dayData.low;
-                
+
                 // Morning session - 9 AM
                 const morningDate = new Date(dayData.date);
                 morningDate.setHours(9, 0, 0, 0);
                 const morningValue = Math.max(0, baseValue + (Math.random() * 0.4 - 0.2) * range);
-                
+
                 // Midday session - 12 PM
                 const middayDate = new Date(dayData.date);
                 middayDate.setHours(12, 0, 0, 0);
                 const middayValue = Math.max(0, morningValue + (Math.random() * 0.6 - 0.3) * range);
-                
+
                 // Afternoon session - 4 PM
                 const afternoonDate = new Date(dayData.date);
                 afternoonDate.setHours(16, 0, 0, 0);
                 const afternoonValue = Math.max(0, dayData.close);
-                
+
                 // Add these sessions to the chart data (simulating intraday movements)
                 chartData.push({
                     time: Math.floor(morningDate.getTime() / 1000),
@@ -294,7 +287,7 @@
                     close: morningValue,
                     timestamp: morningDate.toLocaleString()
                 });
-                
+
                 chartData.push({
                     time: Math.floor(middayDate.getTime() / 1000),
                     open: morningValue,
@@ -303,7 +296,7 @@
                     close: middayValue,
                     timestamp: middayDate.toLocaleString()
                 });
-                
+
                 chartData.push({
                     time: Math.floor(afternoonDate.getTime() / 1000),
                     open: middayValue,
@@ -313,32 +306,32 @@
                     timestamp: afternoonDate.toLocaleString()
                 });
             });
-            
+
             // Sort by time
             chartData.sort((a, b) => a.time - b.time);
-            
+
             return chartData;
         }
-        
+
         // Generate simulated real-time data
         function generateRealtimeData(initialData, count = 30) {
             if (!initialData || initialData.length === 0) {
                 return [];
             }
-            
+
             const realtimeUpdates = [];
             let lastPoint = {...initialData[initialData.length - 1]};
             let lastTime = lastPoint.time;
             let lastClose = lastPoint.close;
-            
+
             for (let i = 0; i < count; i++) {
                 // Add one day (86400 seconds)
                 lastTime += 86400;
-                
+
                 // Random change (up to 5%)
                 const change = lastClose * (Math.random() * 0.1 - 0.05);
                 const newValue = Math.max(1, lastClose + change);
-                
+
                 const newPoint = {
                     time: lastTime,
                     open: lastClose,
@@ -346,31 +339,31 @@
                     low: Math.min(lastClose, newValue),
                     close: newValue
                 };
-                
+
                 realtimeUpdates.push(newPoint);
                 lastClose = newValue;
             }
-            
+
             return realtimeUpdates;
         }
-        
+
         // Generator for real-time updates
         function* getNextRealtimeUpdate(realtimeData) {
             if (!realtimeData || realtimeData.length === 0) {
                 console.warn("No data provided for real-time updates");
                 return null;
             }
-            
+
             console.log(`Starting real-time updates with ${realtimeData.length} data points`);
-            
+
             for (const dataPoint of realtimeData) {
                 yield dataPoint;
             }
-            
+
             console.log("All real-time updates completed");
             return null;
         }
-        
+
         // Helper function to create a better real-time data stream
         function prepareRealtimeDataStream(formattedData, realtimeUpdates) {
             // Make sure we have data to work with
@@ -378,40 +371,40 @@
                 console.error("No formatted data available");
                 return [];
             }
-            
+
             // Clone arrays to avoid mutations
             const historicalData = [...formattedData];
             const futureUpdates = realtimeUpdates ? [...realtimeUpdates] : [];
-            
+
             // Combine all data for the real-time stream, ensuring correct time ordering
             const combinedData = [...historicalData.slice(1), ...futureUpdates];
-            
+
             // Sort by time to ensure proper sequence
             combinedData.sort((a, b) => a.time - b.time);
-            
+
             return combinedData;
         }
-        
+
         // Create a chart for a detection group
         async function createChart(groupName) {
             // Create container for this chart
             const chartGrid = document.getElementById('chartGrid');
             const container = document.createElement('div');
             container.className = 'chart-container';
-            
+
             // Add title
             const title = document.createElement('h2');
             title.textContent = groupName.replace(/_/g, ' ');
             container.appendChild(title);
-            
+
             // Add chart div
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart';
             chartDiv.id = `chart-${groupName}`;
             container.appendChild(chartDiv);
-            
+
             chartGrid.appendChild(container);
-            
+
             try {
                 // Fetch data for this group
                 const response = await fetch(`data/${groupName}.csv`);
@@ -419,15 +412,15 @@
                     console.error(`Failed to load ${groupName}.csv`);
                     return null;
                 }
-                
+
                 const csvText = await response.text();
                 const initialData = await processCSVData(csvText);
-                
+
                 if (!initialData || initialData.length === 0) {
                     console.error(`No valid data for ${groupName}`);
                     return null;
                 }
-                
+
                 // Configure and create chart with appropriate options for CRZ Entries
                 const chartOptions = {
                     layout: {
@@ -497,7 +490,7 @@
                         }
                     }
                 };
-                
+
                 const chart = LightweightCharts.createChart(chartDiv, chartOptions);
 
                 // Add tooltips for better data visualization
@@ -529,7 +522,7 @@
                         minMove: 1,
                     }
                 });
-                
+
                 // Subscribe to crosshair move to show tooltip
                 chart.subscribeCrosshairMove(param => {
                     if (
@@ -543,10 +536,10 @@
                         toolTip.style.display = 'none';
                         return;
                     }
-                    
+
                     const dateStr = new Date(param.time * 1000).toLocaleString();
                     const data = param.seriesData.get(series);
-                    
+
                     if (data) {
                         toolTip.style.display = 'block';
                         const entries = Math.round(data.close);
@@ -554,7 +547,7 @@
                             <div>Date: ${dateStr}</div>
                             <div>CRZ: ${entries}</div>
                         </div>`;
-                        
+
                         const y = param.point.y;
                         let left = param.point.x + toolTipMargin;
                         if (left > chartDiv.clientWidth - toolTipWidth) {
@@ -565,19 +558,19 @@
                         if (top > chartDiv.clientHeight - toolTipHeight) {
                             top = y - toolTipHeight - toolTipMargin;
                         }
-                        
+
                         toolTip.style.left = left + 'px';
                         toolTip.style.top = top + 'px';
                     } else {
                         toolTip.style.display = 'none';
                     }
                 });
-                
+
                 // Set CRZ Entries title on y-axis
                 series.priceScale().applyOptions({
                     scaleMargins: {
                         top: 0.1,  // Reduced margins to zoom in more
-                        bottom: 0.1  
+                        bottom: 0.1
                     },
                     entireTextOnly: true,
                     borderVisible: false,
@@ -597,7 +590,7 @@
                             wickColor: '#10b981'
                         };
                     }
-                    
+
                     // Determine color based on comparison to previous day
                     // but keep all values positive - we're showing entry counts
                     const isUp = candle.close >= previousClose;
@@ -607,29 +600,29 @@
                         color: color,
                         wickColor: color
                     };
-                    
+
                     previousClose = candle.close;
                     return result;
                 });
 
                 // Start with just the first data point
                 series.setData([formattedData[0]]);
-                
+
                 // Ensure chart is properly contained and zoomed in
                 chart.timeScale().fitContent();
-                
+
                 // Set visible range to zoom in but ensure we can see the starting point
                 const visibleRange = {
                     from: 0,
                     to: 10 // Show enough bars to make the chart readable
                 };
                 chart.timeScale().setVisibleLogicalRange(visibleRange);
-                
+
                 // Generate realtime updates based on the actual data pattern
                 let lastPoint = {...formattedData[formattedData.length - 1]};
                 let lastTime = lastPoint.time;
                 let lastClose = Math.max(50, lastPoint.close); // Ensure a positive minimum value
-                
+
                 // Apply different volatility to problematic bridges to prevent negative values
                 let volatility;
                 if (groupName === 'Brooklyn_Bridge' || groupName === 'Hugh_L_Carey_Tunnel') {
@@ -637,34 +630,34 @@
                 } else {
                     volatility = 0.04;
                 }
-                
+
                 // Calculate trend from historical data for more realistic predictions
                 const dataPoints = formattedData.length;
-                const avgChange = dataPoints > 1 ? 
+                const avgChange = dataPoints > 1 ?
                     (formattedData[dataPoints-1].close - formattedData[0].close) / dataPoints : 0;
-                
+
                 // Generate future data points
                 const realtimeUpdates = [];
                 const hoursPerDay = [9, 12, 16]; // Morning, noon, afternoon
-                
+
                 for (let i = 0; i < 10; i++) { // 10 days of updates
                     // For each day, create multiple data points
                     const baseDate = new Date(lastTime * 1000);
                     baseDate.setDate(baseDate.getDate() + 1);
-                    
+
                     let dayOpen = lastClose;
                     let dayHigh = dayOpen;
                     let dayLow = dayOpen;
                     let dayClose = dayOpen;
-                    
+
                     // Create multiple intraday points
                     for (const hour of hoursPerDay) {
                         const pointDate = new Date(baseDate);
                         pointDate.setHours(hour, 0, 0, 0);
-                        
+
                         // Calculate new value with trend and controlled volatility
                         const trendChange = avgChange * (Math.random() * 0.5 + 0.75);
-                        
+
                         // For problematic bridges/tunnels, use asymmetric volatility to bias upward
                         let randomChange;
                         if (groupName === 'Brooklyn_Bridge' || groupName === 'Hugh_L_Carey_Tunnel') {
@@ -673,21 +666,21 @@
                         } else {
                             randomChange = lastClose * (Math.random() * volatility * 2 - volatility);
                         }
-                        
+
                         // Ensure we don't go below the minimum value for entry counts (bigger for problematic groups)
                         const minimumValue = (groupName === 'Brooklyn_Bridge' || groupName === 'Hugh_L_Carey_Tunnel') ? 100 : 1;
                         const newValue = Math.max(minimumValue, lastClose + trendChange + randomChange);
-                        
+
                         // For these specific problematic bridges, add additional safeguard
                         let safeValue = newValue;
                         if (groupName === 'Brooklyn_Bridge' || groupName === 'Hugh_L_Carey_Tunnel') {
                             // Additional guarantee the value doesn't somehow become negative
                             safeValue = Math.abs(newValue);
                         }
-                        
+
                         const isUp = safeValue >= lastClose;
                         const color = isUp ? '#10b981' : '#f43f5e';
-                        
+
                         const timestamp = Math.floor(pointDate.getTime() / 1000);
                         const newPoint = {
                             time: timestamp,
@@ -699,13 +692,13 @@
                             wickColor: color,
                             timestamp: pointDate.toLocaleString()
                         };
-                        
+
                         realtimeUpdates.push(newPoint);
-                        
+
                         // Update for next point
                         lastClose = safeValue;
                         lastTime = timestamp;
-                        
+
                         // Update day OHLC
                         if (hour === hoursPerDay[0]) dayOpen = newValue;
                         dayHigh = Math.max(dayHigh, newValue);
@@ -716,26 +709,26 @@
 
                 // Simulate real-time data - combine historical data (except first point) with future updates
                 const combinedUpdates = [...formattedData.slice(1), ...realtimeUpdates];
-                
+
                 function* getNextRealtimeUpdate(realtimeData) {
                     for (const dataPoint of realtimeData) {
                         yield dataPoint;
                     }
                     return null;
                 }
-                
+
                 const streamingDataProvider = getNextRealtimeUpdate(combinedUpdates);
 
                 // Create buttons container for all controls
                 const buttonsContainer = document.createElement('div');
                 buttonsContainer.className = 'buttons-container';
-                
+
                 // Create and style the tooltip element
                 const realtimeButton = document.createElement('button');
                 realtimeButton.innerText = 'Go to realtime';
                 realtimeButton.className = 'simulation';
                 realtimeButton.addEventListener('click', () => chart.timeScale().scrollToRealTime());
-                
+
                 // Add reset zoom button
                 const resetButton = document.createElement('button');
                 resetButton.innerText = 'Reset Zoom';
@@ -743,24 +736,24 @@
                     chart.timeScale().resetTimeScale();
                     chart.timeScale().fitContent();
                 });
-                
+
                 // Add buttons to container
                 buttonsContainer.appendChild(realtimeButton);
                 buttonsContainer.appendChild(resetButton);
                 container.appendChild(buttonsContainer);
-                
+
                 // Add resize handler
                 const resizeObserver = new ResizeObserver(entries => {
                     const { width } = entries[0].contentRect;
                     chart.applyOptions({ width, height: 250 });
                     chart.timeScale().fitContent();
                 });
-                
+
                 resizeObserver.observe(chartDiv);
-                
+
                 // Create interval for updates - exactly like single_chart.html
                 if (!window.chartIntervals) window.chartIntervals = {};
-                
+
                 // Store the interval ID to clear it if needed
                 window.chartIntervals[groupName] = setInterval(() => {
                     const update = streamingDataProvider.next();
@@ -777,7 +770,7 @@
                 return null;
             }
         }
-        
+
         // Initialize all charts
         async function initCharts() {
             try {
@@ -785,7 +778,7 @@
                 for (const group of detectionGroups) {
                     await createChart(group);
                 }
-                
+
                 // Add a global update watchdog to ensure charts keep updating
                 setInterval(() => {
                     if (window.chartIntervals) {
@@ -805,7 +798,7 @@
                         }
                     }
                 }, 5000); // Check every 5 seconds
-                
+
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
             } catch (err) {
@@ -813,9 +806,9 @@
                 document.getElementById('loading').textContent = 'Error loading charts: ' + err.message;
             }
         }
-        
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', initCharts);
     </script>
 </body>
-</html> 
+</html>
