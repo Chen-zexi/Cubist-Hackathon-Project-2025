@@ -15,14 +15,13 @@ import {
   Layers,
   Eye,
   EyeOff,
+  ExternalLink,
 } from "lucide-react";
 import { NYCMap } from "./nyc-map.jsx";
 import TrafficFlowChart from "./traffic-flow-chart";
 import VehicleTypeDistribution from "./vehicle-type-distribution";
-import RevenueMetrics from "./revenue-metrics";
 import TimeSelector from "./time-selector";
 import MapControls from "./map-controls";
-import MultiChart from "./multi-chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReactNode } from "react";
 import VanillaDataView from "./vanilla-data-view";
@@ -89,11 +88,14 @@ export default function Dashboard() {
                 </h1>
               </div>
               <div className="flex-1 flex justify-center">
-
-
                 <Tabs
                   value={activeTab}
-                  onValueChange={setActiveTab}
+                  onValueChange={(value) => {
+                    // Only change tab if it's not the charts tab
+                    if (value !== "charts") {
+                      setActiveTab(value);
+                    }
+                  }}
                   className="w-[400px]"
                 >
                   <TabsList className="bg-black/50 border border-gray-800/50">
@@ -105,9 +107,10 @@ export default function Dashboard() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="charts"
-                      className="data-[state=active]:bg-emerald-500/20"
+                      className="data-[state=active]:bg-emerald-500/20 flex items-center"
+                      onClick={() => window.open('/multi_chart.html', '_blank')}
                     >
-                      Real-time Charts
+                      Real-time Charts <ExternalLink className="ml-1 h-3 w-3" />
                     </TabsTrigger>
                     <TabsTrigger
                       value="data"
@@ -129,27 +132,13 @@ export default function Dashboard() {
             <Tabs value={activeTab} className="w-full">
               <TabsContent value="dashboard">
                 {/* Key Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-6">
                   <MetricCard
                     title="Current Traffic Volume"
                     value="12,453"
                     change="+5.2%"
                     isPositive={false}
                     icon={<Car className="h-5 w-5 text-emerald-500" />}
-                  />
-                  <MetricCard
-                    title="Average Speed"
-                    value="18.3 mph"
-                    change="+2.1%"
-                    isPositive={true}
-                    icon={<Clock className="h-5 w-5 text-emerald-500" />}
-                  />
-                  <MetricCard
-                    title="Revenue Today"
-                    value="$342,129"
-                    change="+12.5%"
-                    isPositive={true}
-                    icon={<ArrowUpRight className="h-5 w-5 text-emerald-500" />}
                   />
                   <MetricCard
                     title="Congestion Reduction"
@@ -183,17 +172,6 @@ export default function Dashboard() {
                     </div>
                     <CardContent className="p-4 h-[300px]">
                       <VehicleTypeDistribution />
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-black/40 backdrop-blur-md border-gray-800/50">
-                    <div className="p-4 border-b border-gray-800/50">
-                      <h2 className="font-semibold text-white">
-                        Revenue Metrics
-                      </h2>
-                    </div>
-                    <CardContent className="p-4 h-[300px]">
-                      <RevenueMetrics timeRange={timeRange} />
                     </CardContent>
                   </Card>
 
@@ -239,19 +217,6 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="charts">
-                <Card className="bg-black/40 backdrop-blur-md border-gray-800/50">
-                  <div className="p-4 border-b border-gray-800/50">
-                    <h2 className="font-semibold text-white">
-                      Real-time CRZ Entry Points
-                    </h2>
-                  </div>
-                  <CardContent className="p-4">
-                    <MultiChart />
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               <TabsContent value="data">

@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
-
 import * as THREE from "three";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useState } from "react";
