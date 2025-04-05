@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTA Detection Groups - Real-time Charts</title>
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f7fa;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #263238;
+        }
+        h1 {
+            margin: 10px 0;
+            font-size: 24px;
+        }
+        h2 {
+            margin: 5px 0 10px 0;
+            font-size: 16px;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 12px;
+        }
+        .chart-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .chart {
+            width: 100%;
+            height: 250px;
+        }
+        .buttons-container {
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .buttons-container button {
+            all: initial;
+            font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+            font-size: 12px;
+            font-style: normal;
+            font-weight: 510;
+            line-height: 20px;
+            letter-spacing: -0.32px;
+            padding: 5px 10px;
+            color: rgba(19, 23, 34, 1);
+            background-color: rgba(240, 243, 250, 1);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .buttons-container button.simulation {
+            background-color: #26a69a;
+            color: white;
+        }
+        .buttons-container button:hover {
+            background-color: rgba(224, 227, 235, 1);
+        }
+        .buttons-container button.simulation:hover {
+            background-color: #2bbbad;
+        }
+        .buttons-container button:active {
+            background-color: rgba(209, 212, 220, 1);
+        }
+        .buttons-container button.simulation:active {
+            background-color: #1d9485;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            margin: 50px 0;
+            color: #455a64;
+        }
+    </style>
+</head>
+<body>
+    <h1>MTA Congestion Relief Zone - Real-time Charts</h1>
+    
+    <div id="loading" class="loading">Loading charts...</div>
+    
+    <div class="chart-grid" id="chartGrid"></div>
+
+    <script>
+        // List of detection groups
+        const detectionGroups = [
+            'Brooklyn_Bridge',
+            'West_Side_Highway_at_60th_St',
+            'West_60th_St',
+            'Queensboro_Bridge',
+            'Queens_Midtown_Tunnel',
+            'Lincoln_Tunnel',
+            'Holland_Tunnel',
+            'FDR_Drive_at_60th_St',
+            'East_60th_St',
+            'Williamsburg_Bridge',
+            'Manhattan_Bridge',
+            'Hugh_L_Carey_Tunnel'
+        ];
+        
+        // Function to process CSV data
+        async function processCSVData(csvText) {
+            const rows = csvText.trim().split('\n');
+            const headers = rows[0].split(',');
+            
+            const tollDateIndex = headers.indexOf('Toll Date');
+            const crzEntriesIndex = headers.indexOf('CRZ Entries');
+            
+            if (tollDateIndex === -1 || crzEntriesIndex === -1) {
+                console.error('Missing required columns in CSV');
+                return [];
+            }
+            
+            // Extract rows
+            const validRows = rows.slice(1)
+                .map(row => {
+                    const columns = row.split(',');
+                    if (columns.length <= Math.max(tollDateIndex, crzEntriesIndex)) return null;
+                    
+                    const crzEntries = parseInt(columns[crzEntriesIndex], 10);
+                    if (isNaN(crzEntries) || crzEntries < 0) return null; // Skip negative entries
+                    
+                    const dateStr = columns[tollDateIndex];
+                    const dateParts = dateStr.split('/');
+                    if (dateParts.length !== 3) return null;
+                    
+                    const [month, day, year] = dateParts;
+                    // Create a base timestamp for the date
+                    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+                    const timestamp = Math.floor(date.getTime() / 1000);
+                    
+                    return {
+                        timestamp,
+                        value: Math.max(0, crzEntries), // Ensure entries are non-negative
+                        date: date
+                    };
+                })
+                .filter(r => r !== null);
+            
+            // Group by date and create multiple entries per day (hourly distribution)
+            const ohlcByDate = {};
+            
+            validRows.forEach(row => {
+                const dateKey = row.timestamp;
+                
+                if (!ohlcByDate[dateKey]) {
+                    ohlcByDate[dateKey] = {
+                        values: [],
+                        open: row.value,
+                        high: row.value,
+                        low: row.value,
+                        close: row.value,
+                        date: row.date
+                    };
+                }
+                
+                ohlcByDate[dateKey].values.push(row.value);
+                ohlcByDate[dateKey].high = Math.max(ohlcByDate[dateKey].high, row.value);
+                ohlcByDate[dateKey].low = Math.min(ohlcByDate[dateKey].low, row.value);
+                ohlcByDate[dateKey].close = row.value; // Last value becomes close
+            });
+            
+            // Expand each day into multiple data points throughout the day
+            let chartData = [];
+            
+            Object.values(ohlcByDate).forEach(dayData => {
+                // Create a base candle for the day
+                const dayCandle = {
+                    time: Math.floor(dayData.date.getTime() / 1000),
+                    open: dayData.open,
+                    high: dayData.high,
+                    low: dayData.low,
+                    close: dayData.close,
+                    // Add timestamp info for display
+                    timestamp: dayData.date.toLocaleDateString()
+                };
+                chartData.push(dayCandle);
+                
+                // Create additional intraday candles for more detailed visualization
+                // Morning, midday, and afternoon sessions (simulated data based on daily value)
+                const baseValue = dayData.open;
+                const range = dayData.high - dayData.low;
+                
+                // Morning session - 9 AM
+                const morningDate = new Date(dayData.date);
+                morningDate.setHours(9, 0, 0, 0);
+                const morningValue = baseValue + (Math.random() * 0.4 - 0.2) * range;
+                
+                // Midday session - 12 PM
+                const middayDate = new Date(dayData.date);
+                middayDate.setHours(12, 0, 0, 0);
+                const middayValue = morningValue + (Math.random() * 0.6 - 0.3) * range;
+                
+                // Afternoon session - 4 PM
+                const afternoonDate = new Date(dayData.date);
+                afternoonDate.setHours(16, 0, 0, 0);
+                const afternoonValue = dayData.close;
+                
+                // Add these sessions to the chart data (simulating intraday movements)
+                chartData.push({
+                    time: Math.floor(morningDate.getTime() / 1000),
+                    open: baseValue,
+                    high: Math.max(baseValue, morningValue),
+                    low: Math.min(baseValue, morningValue),
+                    close: morningValue,
+                    timestamp: morningDate.toLocaleString()
+                });
+                
+                chartData.push({
+                    time: Math.floor(middayDate.getTime() / 1000),
+                    open: morningValue,
+                    high: Math.max(morningValue, middayValue),
+                    low: Math.min(morningValue, middayValue),
+                    close: middayValue,
+                    timestamp: middayDate.toLocaleString()
+                });
+                
+                chartData.push({
+                    time: Math.floor(afternoonDate.getTime() / 1000),
+                    open: middayValue,
+                    high: Math.max(middayValue, afternoonValue),
+                    low: Math.min(middayValue, afternoonValue),
+                    close: afternoonValue,
+                    timestamp: afternoonDate.toLocaleString()
+                });
+            });
+            
+            // Sort by time
+            chartData.sort((a, b) => a.time - b.time);
+            
+            return chartData;
+        }
+        
+        // Generate simulated real-time data
+        function generateRealtimeData(initialData, count = 30) {
+            if (!initialData || initialData.length === 0) {
+                return [];
+            }
+            
+            const realtimeUpdates = [];
+            let lastPoint = {...initialData[initialData.length - 1]};
+            let lastTime = lastPoint.time;
+            let lastClose = lastPoint.close;
+            
+            for (let i = 0; i < count; i++) {
+                // Add one day (86400 seconds)
+                lastTime += 86400;
+                
+                // Random change (up to 5%)
+                const change = lastClose * (Math.random() * 0.1 - 0.05);
+                const newValue = Math.max(1, lastClose + change);
+                
+                const newPoint = {
+                    time: lastTime,
+                    open: lastClose,
+                    high: Math.max(lastClose, newValue),
+                    low: Math.min(lastClose, newValue),
+                    close: newValue
+                };
+                
+                realtimeUpdates.push(newPoint);
+                lastClose = newValue;
+            }
+            
+            return realtimeUpdates;
+        }
+        
+        // Generator for real-time updates
+        function* getNextRealtimeUpdate(realtimeData) {
+            if (!realtimeData || realtimeData.length === 0) {
+                console.warn("No data provided for real-time updates");
+                return null;
+            }
+            
+            console.log(`Starting real-time updates with ${realtimeData.length} data points`);
+            
+            for (const dataPoint of realtimeData) {
+                yield dataPoint;
+            }
+            
+            console.log("All real-time updates completed");
+            return null;
+        }
+        
+        // Helper function to create a better real-time data stream
+        function prepareRealtimeDataStream(formattedData, realtimeUpdates) {
+            // Make sure we have data to work with
+            if (!formattedData || formattedData.length === 0) {
+                console.error("No formatted data available");
+                return [];
+            }
+            
+            // Clone arrays to avoid mutations
+            const historicalData = [...formattedData];
+            const futureUpdates = realtimeUpdates ? [...realtimeUpdates] : [];
+            
+            // Combine all data for the real-time stream, ensuring correct time ordering
+            const combinedData = [...historicalData.slice(1), ...futureUpdates];
+            
+            // Sort by time to ensure proper sequence
+            combinedData.sort((a, b) => a.time - b.time);
+            
+            return combinedData;
+        }
+        
+        // Create a chart for a detection group
+        async function createChart(groupName) {
+            // Create container for this chart
+            const chartGrid = document.getElementById('chartGrid');
+            const container = document.createElement('div');
+            container.className = 'chart-container';
+            
+            // Add title
+            const title = document.createElement('h2');
+            title.textContent = groupName.replace(/_/g, ' ');
+            container.appendChild(title);
+            
+            // Add chart div
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart';
+            chartDiv.id = `chart-${groupName}`;
+            container.appendChild(chartDiv);
+            
+            chartGrid.appendChild(container);
+            
+            try {
+                // Fetch data for this group
+                const response = await fetch(`detection_groups/${groupName}.csv`);
+                if (!response.ok) {
+                    console.error(`Failed to load ${groupName}.csv`);
+                    return null;
+                }
+                
+                const csvText = await response.text();
+                const initialData = await processCSVData(csvText);
+                
+                if (!initialData || initialData.length === 0) {
+                    console.error(`No valid data for ${groupName}`);
+                    return null;
+                }
+                
+                // Configure and create chart with appropriate options for CRZ Entries
+                const chartOptions = {
+                    layout: {
+                        textColor: 'black',
+                        background: { type: 'solid', color: 'white' },
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif',
+                    },
+                    height: 250,
+                    width: chartDiv.clientWidth,
+                    rightPriceScale: {
+                        autoScale: true,
+                        scaleMargins: {
+                            top: 0.1,  // Reduced top margin to zoom in more
+                            bottom: 0.1 // Reduced bottom margin to zoom in more
+                        },
+                        borderVisible: false,
+                        entireTextOnly: true,
+                        mode: LightweightCharts.PriceScaleMode.Normal // Normal mode works better for entry data
+                    },
+                    timeScale: {
+                        rightOffset: 5,
+                        barSpacing: 15, // Slightly increased spacing for better visibility
+                        fixLeftEdge: true,
+                        lockVisibleTimeRangeOnResize: true,
+                        tickMarkFormatter: (time) => {
+                            const date = new Date(time * 1000);
+                            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        }
+                    },
+                    grid: {
+                        horzLines: {
+                            visible: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        vertLines: {
+                            visible: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    localization: {
+                        timeFormatter: (time) => {
+                            const date = new Date(time * 1000);
+                            return date.toLocaleString();
+                        },
+                    },
+                    handleScroll: {
+                        mouseWheel: true,
+                        pressedMouseMove: true,
+                    },
+                    handleScale: {
+                        axisPressedMouseMove: true,
+                        mouseWheel: true,
+                        pinch: true,
+                    },
+                    crosshair: {
+                        mode: 1,
+                    }
+                };
+                
+                const chart = LightweightCharts.createChart(chartDiv, chartOptions);
+
+                // Add tooltips for better data visualization
+                const toolTipWidth = 70;
+                const toolTipHeight = 60;
+                const toolTipMargin = 10;
+
+                // Create and style the tooltip element
+                const toolTip = document.createElement('div');
+                toolTip.style = `width: ${toolTipWidth}px; height: ${toolTipHeight}px; position: absolute; display: none; padding: 5px; box-sizing: border-box; font-size: 11px; text-align: left; z-index: 1000; top: 12px; left: 12px; pointer-events: none; border: 1px solid; border-radius: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;`;
+                toolTip.style.background = 'white';
+                toolTip.style.color = 'black';
+                toolTip.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                chartDiv.appendChild(toolTip);
+
+                // Add candlestick series with additional formatting
+                const series = chart.addCandlestickSeries({
+                    upColor: '#26a69a',
+                    downColor: '#ef5350',
+                    borderVisible: false,
+                    wickUpColor: '#26a69a',
+                    wickDownColor: '#ef5350',
+                    priceScaleId: 'right',
+                    priceFormat: {
+                        type: 'price',
+                        precision: 0,
+                        minMove: 1,
+                    }
+                });
+                
+                // Subscribe to crosshair move to show tooltip
+                chart.subscribeCrosshairMove(param => {
+                    if (
+                        param.point === undefined ||
+                        !param.time ||
+                        param.point.x < 0 ||
+                        param.point.x > chartDiv.clientWidth ||
+                        param.point.y < 0 ||
+                        param.point.y > chartDiv.clientHeight
+                    ) {
+                        toolTip.style.display = 'none';
+                        return;
+                    }
+                    
+                    const dateStr = new Date(param.time * 1000).toLocaleString();
+                    const data = param.seriesData.get(series);
+                    
+                    if (data) {
+                        toolTip.style.display = 'block';
+                        const entries = Math.round(data.close);
+                        toolTip.innerHTML = `<div style="font-size: 11px; margin: 2px 0px; color: ${data.open <= data.close ? '#26a69a' : '#ef5350'}">
+                            <div>Date: ${dateStr}</div>
+                            <div>CRZ: ${entries}</div>
+                        </div>`;
+                        
+                        const y = param.point.y;
+                        let left = param.point.x + toolTipMargin;
+                        if (left > chartDiv.clientWidth - toolTipWidth) {
+                            left = param.point.x - toolTipMargin - toolTipWidth;
+                        }
+
+                        let top = y + toolTipMargin;
+                        if (top > chartDiv.clientHeight - toolTipHeight) {
+                            top = y - toolTipHeight - toolTipMargin;
+                        }
+                        
+                        toolTip.style.left = left + 'px';
+                        toolTip.style.top = top + 'px';
+                    } else {
+                        toolTip.style.display = 'none';
+                    }
+                });
+                
+                // Set CRZ Entries title on y-axis
+                series.priceScale().applyOptions({
+                    scaleMargins: {
+                        top: 0.1,  // Reduced margins to zoom in more
+                        bottom: 0.1  
+                    },
+                    entireTextOnly: true,
+                    borderVisible: false,
+                    title: 'CRZ Entries',
+                    autoScale: true,
+                    mode: LightweightCharts.PriceScaleMode.Normal // Ensure we're using normal mode for entry data
+                });
+
+                // Prepare data with coloring based on previous close
+                let previousClose = null;
+                const formattedData = initialData.map((candle, index) => {
+                    if (index === 0) {
+                        previousClose = candle.close;
+                        return {
+                            ...candle,
+                            color: '#26a69a',
+                            wickColor: '#26a69a'
+                        };
+                    }
+                    
+                    // Determine color based on comparison to previous day
+                    // but keep all values positive - we're showing entry counts
+                    const isUp = candle.close >= previousClose;
+                    const color = isUp ? '#26a69a' : '#ef5350';
+                    const result = {
+                        ...candle,
+                        color: color,
+                        wickColor: color
+                    };
+                    
+                    previousClose = candle.close;
+                    return result;
+                });
+
+                // Start with just the first data point
+                series.setData([formattedData[0]]);
+                
+                // Ensure chart is properly contained and zoomed in
+                chart.timeScale().fitContent();
+                
+                // Set visible range to zoom in but ensure we can see the starting point
+                const visibleRange = {
+                    from: 0,
+                    to: 10 // Show enough bars to make the chart readable
+                };
+                chart.timeScale().setVisibleLogicalRange(visibleRange);
+                
+                // Generate realtime updates based on the actual data pattern
+                let lastPoint = {...formattedData[formattedData.length - 1]};
+                let lastTime = lastPoint.time;
+                let lastClose = lastPoint.close;
+                
+                // Apply different volatility to Brooklyn Bridge to keep it contained
+                const volatility = groupName === 'Brooklyn_Bridge' ? 0.02 : 0.04;
+                
+                // Calculate trend from historical data for more realistic predictions
+                const dataPoints = formattedData.length;
+                const avgChange = dataPoints > 1 ? 
+                    (formattedData[dataPoints-1].close - formattedData[0].close) / dataPoints : 0;
+                
+                // Generate future data points
+                const realtimeUpdates = [];
+                const hoursPerDay = [9, 12, 16]; // Morning, noon, afternoon
+                
+                for (let i = 0; i < 10; i++) { // 10 days of updates
+                    // For each day, create multiple data points
+                    const baseDate = new Date(lastTime * 1000);
+                    baseDate.setDate(baseDate.getDate() + 1);
+                    
+                    let dayOpen = lastClose;
+                    let dayHigh = dayOpen;
+                    let dayLow = dayOpen;
+                    let dayClose = dayOpen;
+                    
+                    // Create multiple intraday points
+                    for (const hour of hoursPerDay) {
+                        const pointDate = new Date(baseDate);
+                        pointDate.setHours(hour, 0, 0, 0);
+                        
+                        // Calculate new value with trend and controlled volatility
+                        const trendChange = avgChange * (Math.random() * 0.5 + 0.75);
+                        const randomChange = lastClose * (Math.random() * volatility * 2 - volatility);
+                        
+                        // Ensure we don't go below 1 for entry counts
+                        const newValue = Math.max(1, lastClose + trendChange + randomChange);
+                        
+                        const isUp = newValue >= lastClose;
+                        const color = isUp ? '#26a69a' : '#ef5350';
+                        
+                        const timestamp = Math.floor(pointDate.getTime() / 1000);
+                        const newPoint = {
+                            time: timestamp,
+                            open: lastClose,
+                            high: Math.max(lastClose, newValue),
+                            low: Math.min(lastClose, newValue),
+                            close: newValue,
+                            color: color,
+                            wickColor: color,
+                            timestamp: pointDate.toLocaleString()
+                        };
+                        
+                        realtimeUpdates.push(newPoint);
+                        
+                        // Update for next point
+                        lastClose = newValue;
+                        lastTime = timestamp;
+                        
+                        // Update day OHLC
+                        if (hour === hoursPerDay[0]) dayOpen = newValue;
+                        dayHigh = Math.max(dayHigh, newValue);
+                        dayLow = Math.min(dayLow, newValue);
+                        if (hour === hoursPerDay[hoursPerDay.length - 1]) dayClose = newValue;
+                    }
+                }
+
+                // Simulate real-time data - combine historical data (except first point) with future updates
+                const combinedUpdates = [...formattedData.slice(1), ...realtimeUpdates];
+                
+                function* getNextRealtimeUpdate(realtimeData) {
+                    for (const dataPoint of realtimeData) {
+                        yield dataPoint;
+                    }
+                    return null;
+                }
+                
+                const streamingDataProvider = getNextRealtimeUpdate(combinedUpdates);
+
+                // Create buttons container for all controls
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'buttons-container';
+                
+                // Create and style the tooltip element
+                const realtimeButton = document.createElement('button');
+                realtimeButton.innerText = 'Go to realtime';
+                realtimeButton.addEventListener('click', () => chart.timeScale().scrollToRealTime());
+                
+                // Add reset zoom button
+                const resetButton = document.createElement('button');
+                resetButton.innerText = 'Reset Zoom';
+                resetButton.addEventListener('click', () => {
+                    chart.timeScale().resetTimeScale();
+                    chart.timeScale().fitContent();
+                });
+                
+                // Add buttons to container
+                buttonsContainer.appendChild(realtimeButton);
+                buttonsContainer.appendChild(resetButton);
+                container.appendChild(buttonsContainer);
+                
+                // Add resize handler
+                const resizeObserver = new ResizeObserver(entries => {
+                    const { width } = entries[0].contentRect;
+                    chart.applyOptions({ width, height: 250 });
+                    chart.timeScale().fitContent();
+                });
+                
+                resizeObserver.observe(chartDiv);
+                
+                // Create interval for updates - exactly like single_chart.html
+                if (!window.chartIntervals) window.chartIntervals = {};
+                
+                // Store the interval ID to clear it if needed
+                window.chartIntervals[groupName] = setInterval(() => {
+                    const update = streamingDataProvider.next();
+                    if (update.done) {
+                        clearInterval(window.chartIntervals[groupName]);
+                        return;
+                    }
+                    series.update(update.value);
+                }, 1000); // Update once per second
+
+                return chart;
+            } catch (err) {
+                console.error(`Error creating chart for ${groupName}:`, err);
+                return null;
+            }
+        }
+        
+        // Initialize all charts
+        async function initCharts() {
+            try {
+                // Create charts one by one to maintain independence
+                for (const group of detectionGroups) {
+                    await createChart(group);
+                }
+                
+                // Add a global update watchdog to ensure charts keep updating
+                setInterval(() => {
+                    if (window.chartIntervals) {
+                        // Check each chart interval and restart any that have stopped
+                        for (const groupName in window.chartIntervals) {
+                            if (window.chartIntervals[groupName] === null) {
+                                console.log(`Detected stopped updates for ${groupName}, attempting to restart`);
+                                const chartDiv = document.getElementById(`chart-${groupName}`);
+                                if (chartDiv) {
+                                    // Send a synthetic click to the reset button to restart updates
+                                    const resetButton = chartDiv.parentElement.querySelector('button:nth-child(2)');
+                                    if (resetButton) {
+                                        resetButton.click();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }, 5000); // Check every 5 seconds
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+            } catch (err) {
+                console.error('Error initializing charts:', err);
+                document.getElementById('loading').textContent = 'Error loading charts: ' + err.message;
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initCharts);
+    </script>
+</body>
+</html> 

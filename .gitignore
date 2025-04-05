@@ -1,0 +1,54 @@
+.DS_Store
+.venv
+.env
+eda.ipynb
+infor.md# Dependencies
+node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+data/*.csv
+# Next.js build output
+.next/
+out/
+
+# Production
+/build
+
+# Environment files
+.env
+.env*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS specific
+.DS_Store
+*.pem
+
+# IDE/Editor folders
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mock data (if you want to exclude large data files from git)
+# Uncomment if you want to exclude all CSV files
+# *.csv
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
