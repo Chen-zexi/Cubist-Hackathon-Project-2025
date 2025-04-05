@@ -1,30 +1,24 @@
 # MTA Congestion Relief Zone Analytics
 
-A modern React dashboard for visualizing MTA Congestion Relief Zone data with real-time charts.
+A multi-feature dashboard for understanding MTA Congestion Avoidance Zones with a 3D interactive map, predictor for current congestion and crowdedness in zones, and multifaceted analytics.
 
-## Features
-
-- Interactive candlestick charts for each detection point
-- Real-time data simulation with customizable update frequency
-- Modern, responsive UI with Tailwind CSS
-- Dark mode support
-- Multiple views: Charts, Dashboard, and Activity tabs
-
-## Technology Stack
+## Tech Stack
 
 - React with TypeScript
 - Vite for fast development
 - Lightweight Charts for high-performance financial-style charts
 - Tailwind CSS for styling
-- Lucide React for beautiful icons
+- Lucide React for icons
+- Mapbox for 3D mapping and interactivity
+- Regular Javascript & HTML
 
 ## Getting Started
 
 1. Clone the repository
 2. Install dependencies: `npm install`
 3. Run the development server: `npm run dev`
-4. Open [http://localhost:5173](http://localhost:5173) in your browser
-5. IMPORTANT: Download the occupancy_analysis.csv file and add it to public/data 
+4. Open [http://localhost:5173](http://localhost:3000) in your browser
+5. IMPORTANT: Download the occupancy_analysis.csv file from the link and add it to public/data: https://drive.google.com/file/d/1BL4tts7UcR3hmqHFVg1rAC8bYEKME1cv/view?usp=drive_link
 
 ## Project Structure
 
