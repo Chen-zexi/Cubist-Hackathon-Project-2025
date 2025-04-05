@@ -25,6 +25,7 @@ import MapControls from "./map-controls";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReactNode } from "react";
 import VanillaDataView from "./vanilla-data-view";
+import RealTimeChartsPage from "./real-time-charts";
 
 // Define interfaces for component props
 interface MetricCardProps {
@@ -90,12 +91,7 @@ export default function Dashboard() {
               <div className="flex-1 flex justify-center">
                 <Tabs
                   value={activeTab}
-                  onValueChange={(value) => {
-                    // Only change tab if it's not the charts tab
-                    if (value !== "charts") {
-                      setActiveTab(value);
-                    }
-                  }}
+                  onValueChange={setActiveTab}
                   className="w-[400px]"
                 >
                   <TabsList className="bg-black/50 border border-gray-800/50">
@@ -108,9 +104,8 @@ export default function Dashboard() {
                     <TabsTrigger
                       value="charts"
                       className="data-[state=active]:bg-emerald-500/20 flex items-center"
-                      onClick={() => window.open('/multi_chart.html', '_blank')}
                     >
-                      Real-time Charts <ExternalLink className="ml-1 h-3 w-3" />
+                      Real-time Charts
                     </TabsTrigger>
                     <TabsTrigger
                       value="data"
@@ -217,6 +212,19 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="charts">
+                <Card className="bg-black/40 backdrop-blur-md border-gray-800/50 h-[calc(100vh-200px)] overflow-auto">
+                  <div className="p-4 border-b border-gray-800/50">
+                    <h2 className="font-semibold text-white">
+                      Real-time Charts
+                    </h2>
+                  </div>
+                  <CardContent className="p-0 h-full">
+                <RealTimeChartsPage/>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="data">
