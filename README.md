@@ -17,7 +17,7 @@ A multi-feature dashboard for understanding MTA Congestion Avoidance Zones with 
 1. Clone the repository
 2. Install dependencies: `npm install`
 3. Run the development server: `npm run dev`
-4. Open [http://localhost:5173](http://localhost:3000) in your browser
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 5. IMPORTANT: Download the occupancy_analysis.csv file from the link and add it to public/data: https://drive.google.com/file/d/1BL4tts7UcR3hmqHFVg1rAC8bYEKME1cv/view?usp=drive_link
 
 ## Project Structure
