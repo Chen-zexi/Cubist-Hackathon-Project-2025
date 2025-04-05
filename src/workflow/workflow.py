@@ -7,6 +7,8 @@ from typing import Any
 from src.workflow.other_tools import execute_crz_function
 from src.utils.data_loader import load_and_process_data
 from src.models.schemas import functions_info
+import warnings
+warnings.filterwarnings('ignore')
 
 
 def run_workflow(user_query: str):

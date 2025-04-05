@@ -9,7 +9,6 @@ def load_and_process_data(file_path):
     Load and process MTA Congestion Relief Zone data with comprehensive cleaning and feature engineering
     """
     # Load data
-    print(f"Loading data from {file_path}...")
     df = pd.read_csv(file_path)
     
     # Convert date and time columns to appropriate types
@@ -40,8 +39,6 @@ def load_and_process_data(file_path):
         else:
             df[col] = df[col].fillna('Unknown')
     
-    # Create aggregate views for common queries
-    print(f"Creating aggregate views...")
     
     # Daily aggregates
     daily_entries = df.groupby('Toll Date').agg({
@@ -74,5 +71,4 @@ def load_and_process_data(file_path):
         'entry_point': entry_point_entries
     }
     
-    print(f"Processed {df.shape[0]} records with {df.shape[1]} features")
     return df, aggregations 

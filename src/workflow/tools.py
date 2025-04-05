@@ -314,9 +314,22 @@ def analyze_vehicle_distribution(df,
     -----------
     df : pandas.DataFrame
         The MTA CRZ dataset
-    [filtering parameters as in filter_crz_data]
-    compare_with : dict, optional
-        Dictionary with filter parameters for comparison period
+    start_date : str, optional
+        Start date in 'YYYY-MM-DD' format
+    end_date : str, optional
+        End date in 'YYYY-MM-DD' format
+    day_type : str, optional
+        'weekday', 'weekend', or specific day name (e.g., 'Monday')
+    hour_range : tuple, optional
+        (start_hour, end_hour) - integers from 0-23
+    time_period : str, optional
+        'Peak' or 'Overnight'
+    entry_point : str, optional
+        Specific entry point (Detection Group)
+    entry_region : str, optional
+        Specific region (Detection Region)
+    compare_with : list of str, optional
+        List of named comparison periods (e.g., ["weekday", "weekend", "rush_hour"])
         
     Returns:
     --------
@@ -324,7 +337,7 @@ def analyze_vehicle_distribution(df,
         Vehicle distribution analysis including:
         - vehicle_distribution: Breakdown by vehicle type
         - total_volume: Total entry volume
-        - comparison: Optional comparison with another time period
+        - comparisons: Optional comparisons with other time periods
         - filter_summary: Summary of applied filters
     """
     # Apply filters for main period
@@ -347,32 +360,51 @@ def analyze_vehicle_distribution(df,
     # Sort by volume
     vehicle_counts = vehicle_counts.sort_values('CRZ Entries', ascending=False)
     
-    # Prepare comparison if requested
-    comparison_data = None
-    if compare_with:
-        # Apply filters for comparison period
-        comp_df = filter_crz_data(df, **compare_with)
-        
-        # Group by vehicle class
-        comp_counts = comp_df.groupby('Vehicle Class')['CRZ Entries'].sum().reset_index()
-        
-        # Calculate percentages
-        comp_total = comp_counts['CRZ Entries'].sum()
-        comp_counts['Percentage'] = (comp_counts['CRZ Entries'] / comp_total * 100).round(1)
-        
-        # Create comparison dataset
-        comparison_data = {
-            'vehicle_distribution': [
-                {
-                    'vehicle_class': row['Vehicle Class'],
-                    'volume': int(row['CRZ Entries']),
-                    'percentage': float(row['Percentage'])
-                }
-                for _, row in comp_counts.sort_values('CRZ Entries', ascending=False).iterrows()
-            ],
-            'total_volume': int(comp_total),
-            'filter_summary': {key: value for key, value in compare_with.items() if value is not None}
-        }
+    # Prepare comparisons if requested
+    comparisons = []
+    if compare_with and isinstance(compare_with, list) and len(compare_with) > 0:
+        for comparison_name in compare_with:
+            # Map comparison name to specific filter parameters
+            comparison_filters = generate_comparison_filters(
+                comparison_name, 
+                current_day_type=day_type,
+                current_hour_range=hour_range,
+                current_time_period=time_period
+            )
+            
+            # Skip invalid comparison names
+            if not comparison_filters:
+                continue
+                
+            # Apply filters for comparison period
+            comp_df = filter_crz_data(df, **comparison_filters)
+            
+            # Group by vehicle class
+            comp_counts = comp_df.groupby('Vehicle Class')['CRZ Entries'].sum().reset_index()
+            
+            # Calculate percentages
+            comp_total = comp_counts['CRZ Entries'].sum()
+            comp_counts['Percentage'] = (comp_counts['CRZ Entries'] / comp_total * 100).round(1)
+            
+            # Format the comparison display name
+            display_name = comparison_name.replace('_', ' ').title()
+            
+            # Create comparison dataset
+            comparison_data = {
+                'name': display_name,
+                'vehicle_distribution': [
+                    {
+                        'vehicle_class': row['Vehicle Class'],
+                        'volume': int(row['CRZ Entries']),
+                        'percentage': float(row['Percentage'])
+                    }
+                    for _, row in comp_counts.sort_values('CRZ Entries', ascending=False).iterrows()
+                ],
+                'total_volume': int(comp_total),
+                'filter_summary': comparison_filters
+            }
+            
+            comparisons.append(comparison_data)
     
     # Prepare results
     results = {
@@ -395,10 +427,78 @@ def analyze_vehicle_distribution(df,
         }
     }
     
-    if comparison_data:
-        results['comparison'] = comparison_data
+    if comparisons:
+        results['comparisons'] = comparisons
     
     return results
+
+def generate_comparison_filters(comparison_name, current_day_type=None, current_hour_range=None, current_time_period=None):
+    """
+    Generate filter parameters based on a comparison name
+    
+    Parameters:
+    -----------
+    comparison_name : str
+        Name of the comparison period (e.g., "weekday", "weekend", "rush_hour")
+    current_day_type : str, optional
+        Current day type filter for context
+    current_hour_range : tuple, optional
+        Current hour range filter for context
+    current_time_period : str, optional
+        Current time period filter for context
+    
+    Returns:
+    --------
+    dict
+        Filter parameters for the comparison period
+    """
+    comparison_name = comparison_name.lower().strip()
+    
+    # Define standard comparison filters
+    comparisons = {
+        # Day type comparisons
+        "weekday": {"day_type": "weekday"},
+        "weekend": {"day_type": "weekend"},
+        "monday": {"day_type": "Monday"},
+        "tuesday": {"day_type": "Tuesday"},
+        "wednesday": {"day_type": "Wednesday"},
+        "thursday": {"day_type": "Thursday"},
+        "friday": {"day_type": "Friday"},
+        "saturday": {"day_type": "Saturday"},
+        "sunday": {"day_type": "Sunday"},
+        
+        # Time period comparisons
+        "morning": {"hour_range": (6, 10)},
+        "afternoon": {"hour_range": (11, 16)},
+        "evening": {"hour_range": (17, 21)},
+        "night": {"hour_range": (22, 5)},
+        "rush_hour": {"hour_range": (7, 9)},
+        "peak": {"time_period": "Peak"},
+        "overnight": {"time_period": "Overnight"},
+        
+        # Vehicle type comparisons
+        "passenger": {"vehicle_class": "1 - Passenger Vehicle"},
+        "commercial": {"vehicle_class": "2 - Commercial Vehicle"},
+        "truck": {"vehicle_class": "3 - Small Truck"},
+        "large_truck": {"vehicle_class": "4 - Large Truck"},
+        "bus": {"vehicle_class": "5 - Bus"},
+        "taxi": {"vehicle_class": "TLC Taxi/FHV"}
+    }
+    
+    # Special handling for comparison names that require contextual knowledge
+    if comparison_name == "opposite_day":
+        # If current day is weekday, compare with weekend and vice versa
+        if current_day_type == "weekday":
+            return {"day_type": "weekend"}
+        elif current_day_type == "weekend":
+            return {"day_type": "weekday"}
+        # For specific days, compare with the weekend if it's a weekday and vice versa
+        elif current_day_type in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+            return {"day_type": "weekend"}
+        elif current_day_type in ["Saturday", "Sunday"]:
+            return {"day_type": "weekday"}
+    
+    return comparisons.get(comparison_name, {})
 
 def analyze_time_trends(df, 
                       metric='CRZ Entries',
@@ -406,6 +506,8 @@ def analyze_time_trends(df,
                       start_date=None, 
                       end_date=None,
                       day_type=None,
+                      hour_range=None,
+                      time_period=None,
                       vehicle_class=None,
                       entry_point=None,
                       entry_region=None):
@@ -420,7 +522,22 @@ def analyze_time_trends(df,
         Metric to analyze: 'CRZ Entries' or 'Excluded Roadway Entries'
     time_unit : str, optional
         Time unit for aggregation: 'hour', 'day', 'week', 'month'
-    [filtering parameters as in filter_crz_data]
+    start_date : str, optional
+        Start date in 'YYYY-MM-DD' format
+    end_date : str, optional
+        End date in 'YYYY-MM-DD' format
+    day_type : str, optional
+        'weekday', 'weekend', or specific day name (e.g., 'Monday')
+    hour_range : tuple, optional
+        (start_hour, end_hour) - integers from 0-23
+    time_period : str, optional
+        'Peak' or 'Overnight'
+    vehicle_class : str or int, optional
+        Vehicle class (1-5 or 'TLC Taxi/FHV')
+    entry_point : str, optional
+        Specific entry point to analyze
+    entry_region : str, optional
+        Specific region to analyze
         
     Returns:
     --------
@@ -435,6 +552,8 @@ def analyze_time_trends(df,
                                  start_date=start_date, 
                                  end_date=end_date,
                                  day_type=day_type,
+                                 hour_range=hour_range,
+                                 time_period=time_period,
                                  vehicle_class=vehicle_class,
                                  entry_point=entry_point,
                                  entry_region=entry_region)
@@ -918,5 +1037,341 @@ def compare_traffic_segments(df,
     
     else:
         raise ValueError(f"Unsupported comparison dimension: {dimension}")
+    
+    return results
+
+def analyze_regional_traffic_flow(df,
+                               start_date=None, 
+                               end_date=None,
+                               day_type=None, 
+                               hour_range=None,
+                               time_period=None,
+                               vehicle_class=None,
+                               source_region=None,
+                               destination_region=None,
+                               top_n=5,
+                               include_time_variation=False):
+    """
+    Analyze traffic flows between different regions in the Congestion Relief Zone
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The MTA CRZ dataset
+    start_date : str, optional
+        Start date in 'YYYY-MM-DD' format
+    end_date : str, optional
+        End date in 'YYYY-MM-DD' format
+    day_type : str, optional
+        'weekday', 'weekend', or specific day name (e.g., 'Monday')
+    hour_range : tuple, optional
+        (start_hour, end_hour) - integers from 0-23
+    time_period : str, optional
+        'Peak' or 'Overnight'
+    vehicle_class : str or int, optional
+        Vehicle class (1-5 or 'TLC Taxi/FHV')
+    source_region : str, optional
+        Source region to filter by
+    destination_region : str, optional
+        Destination region to filter by
+    top_n : int, optional
+        Number of top flow patterns to return
+    include_time_variation : bool, optional
+        Whether to include analysis of how flows vary by time of day
+        
+    Returns:
+    --------
+    dict
+        Regional traffic flow analysis including:
+        - regional_flows: Top flows between regions
+        - total_volume: Total traffic volume in the analysis
+        - time_variations: Optional time-based variation in flows
+        - filter_summary: Summary of applied filters
+    """
+    # Apply filters
+    filtered_df = filter_crz_data(df, 
+                                 start_date=start_date, 
+                                 end_date=end_date,
+                                 day_type=day_type, 
+                                 hour_range=hour_range,
+                                 time_period=time_period,
+                                 vehicle_class=vehicle_class)
+    
+    # Filter by source and destination regions if provided
+    if source_region:
+        filtered_df = filtered_df[filtered_df['Detection Region'] == source_region]
+    
+    # For destination region, we would need additional data about where vehicles go after entry
+    # Since the dataset might not have this directly, we'll use a proxy or supplemental logic
+    # This is a placeholder and should be adjusted based on actual data structure
+    
+    # Group by region to get traffic volume by region
+    region_flows = filtered_df.groupby('Detection Region')['CRZ Entries'].sum().reset_index()
+    region_flows = region_flows.sort_values('CRZ Entries', ascending=False)
+    
+    # Calculate percentages
+    total_volume = region_flows['CRZ Entries'].sum()
+    region_flows['Percentage'] = (region_flows['CRZ Entries'] / total_volume * 100).round(1)
+    
+    # Get top regions by volume
+    top_regions = region_flows.head(top_n)
+    
+    # Optional time-based analysis
+    time_variations = None
+    if include_time_variation:
+        # Analyze how regional flows vary by hour of day
+        time_variations = {}
+        for region in top_regions['Detection Region']:
+            region_data = filtered_df[filtered_df['Detection Region'] == region]
+            hourly_flow = region_data.groupby('Hour of Day')['CRZ Entries'].sum().reset_index()
+            peak_hour = hourly_flow.loc[hourly_flow['CRZ Entries'].idxmax(), 'Hour of Day']
+            
+            time_variations[region] = {
+                'peak_hour': int(peak_hour),
+                'hourly_distribution': hourly_flow.set_index('Hour of Day')['CRZ Entries'].to_dict()
+            }
+    
+    # Prepare results
+    results = {
+        'regional_flows': [
+            {
+                'region': row['Detection Region'],
+                'volume': int(row['CRZ Entries']),
+                'percentage': float(row['Percentage'])
+            }
+            for _, row in top_regions.iterrows()
+        ],
+        'total_volume': int(total_volume),
+        'filter_summary': {
+            'date_range': f"{filtered_df['Toll Date'].min().strftime('%Y-%m-%d')} to {filtered_df['Toll Date'].max().strftime('%Y-%m-%d')}" if not filtered_df.empty else "No data",
+            'day_type': day_type if day_type else "All days",
+            'hour_range': f"{hour_range[0]}:00 to {hour_range[1]}:00" if hour_range else "All hours",
+            'time_period': time_period if time_period else "All periods",
+            'vehicle_class': vehicle_class if vehicle_class else "All vehicles",
+            'source_region': source_region if source_region else "All regions",
+            'destination_region': destination_region if destination_region else "Not specified"
+        }
+    }
+    
+    if time_variations:
+        results['time_variations'] = time_variations
+    
+    return results
+
+def forecast_congestion(df,
+                     forecast_date=None,
+                     forecast_day_type=None,
+                     forecast_hour=None,
+                     region=None,
+                     entry_point=None,
+                     vehicle_class=None,
+                     lookback_days=30,
+                     use_historical_trends=True):
+    """
+    Forecast traffic congestion based on historical patterns and trends
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The MTA CRZ dataset
+    forecast_date : str, optional
+        Target date for forecasting in 'YYYY-MM-DD' format
+    forecast_day_type : str, optional
+        Day type to forecast ('weekday', 'weekend', or specific day name)
+    forecast_hour : int, optional
+        Hour of day to forecast (0-23)
+    region : str, optional
+        Region to forecast congestion for
+    entry_point : str, optional
+        Specific entry point to forecast congestion for
+    vehicle_class : str or int, optional
+        Vehicle class to forecast congestion for
+    lookback_days : int, optional
+        Number of days to look back for historical patterns
+    use_historical_trends : bool, optional
+        Whether to consider long-term trends in forecasting
+        
+    Returns:
+    --------
+    dict
+        Congestion forecast including:
+        - forecast_volume: Predicted traffic volume
+        - confidence_interval: Range of likely values
+        - historical_context: Comparison with historical data
+        - factors: Key factors influencing the forecast
+    """
+    # Determine the target date/time for forecasting
+    if forecast_date:
+        target_date = pd.to_datetime(forecast_date)
+        # Extract day of week
+        target_day = target_date.day_name()
+    elif forecast_day_type:
+        # If only day type is provided, use next occurrence of that day
+        today = pd.Timestamp.now().date()
+        
+        if forecast_day_type.lower() == 'weekday':
+            # Find next weekday
+            days_ahead = 1 - today.weekday() if today.weekday() > 4 else 0
+            target_date = pd.Timestamp(today + pd.Timedelta(days=days_ahead))
+            target_day = target_date.day_name()
+        elif forecast_day_type.lower() == 'weekend':
+            # Find next weekend day
+            days_ahead = 5 - today.weekday() if today.weekday() < 5 else 0
+            target_date = pd.Timestamp(today + pd.Timedelta(days=days_ahead))
+            target_day = target_date.day_name()
+        else:
+            # Find next occurrence of specific day
+            day_to_num = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, 
+                         "Friday": 4, "Saturday": 5, "Sunday": 6}
+            target_day = forecast_day_type
+            target_day_num = day_to_num.get(target_day, 0)
+            days_ahead = (target_day_num - today.weekday()) % 7
+            if days_ahead == 0:
+                days_ahead = 7  # If today, find next week
+            target_date = pd.Timestamp(today + pd.Timedelta(days=days_ahead))
+    else:
+        # Default to tomorrow
+        today = pd.Timestamp.now().date()
+        target_date = pd.Timestamp(today + pd.Timedelta(days=1))
+        target_day = target_date.day_name()
+    
+    target_hour = forecast_hour if forecast_hour is not None else 8  # Default to morning rush hour
+    
+    # Calculate lookback range
+    latest_date = df['Toll Date'].max()
+    earliest_date = latest_date - pd.Timedelta(days=lookback_days)
+    
+    # Filter data for similar patterns
+    filters = {
+        'start_date': earliest_date.strftime('%Y-%m-%d'),
+        'end_date': latest_date.strftime('%Y-%m-%d'),
+    }
+    
+    # Add filters for day and hour patterns
+    if target_day:
+        filters['day_type'] = target_day
+    
+    # Filter for entry point or region if provided
+    if region:
+        filters['entry_region'] = region
+    if entry_point:
+        filters['entry_point'] = entry_point
+    if vehicle_class:
+        filters['vehicle_class'] = vehicle_class
+    
+    # Get historical data
+    historical_df = filter_crz_data(df, **filters)
+    
+    # Focus on same time of day if hour provided
+    if forecast_hour is not None:
+        historical_df = historical_df[historical_df['Hour of Day'] == forecast_hour]
+    
+    # No data available
+    if historical_df.empty:
+        return {
+            'forecast_volume': None,
+            'confidence_interval': None,
+            'forecast_summary': "Insufficient historical data for forecast",
+            'forecast_parameters': {
+                'target_date': target_date.strftime('%Y-%m-%d'),
+                'target_day': target_day,
+                'target_hour': target_hour,
+                'region': region if region else "All regions",
+                'entry_point': entry_point if entry_point else "All entry points",
+                'vehicle_class': vehicle_class if vehicle_class else "All vehicles"
+            }
+        }
+    
+    # Calculate daily pattern by hour
+    hourly_pattern = historical_df.groupby('Hour of Day')['CRZ Entries'].mean()
+    
+    # Calculate day of week pattern
+    day_pattern = historical_df.groupby('Day of Week')['CRZ Entries'].mean()
+    
+    # Calculate base forecast using historical data
+    if forecast_hour is not None:
+        base_forecast = historical_df[historical_df['Hour of Day'] == forecast_hour]['CRZ Entries'].mean()
+    else:
+        # Get average for the whole day
+        base_forecast = historical_df.groupby(['Toll Date']).agg({'CRZ Entries': 'sum'})['CRZ Entries'].mean()
+    
+    # Adjust for trends if enabled
+    trend_factor = 1.0
+    trend_description = "No trend adjustment applied"
+    if use_historical_trends and len(historical_df['Toll Date'].unique()) > 7:
+        # Calculate simple linear trend
+        daily_volumes = historical_df.groupby('Toll Date')['CRZ Entries'].sum().reset_index()
+        daily_volumes['day_index'] = range(len(daily_volumes))
+        
+        if len(daily_volumes) > 1:
+            from scipy import stats
+            slope, intercept, r_value, p_value, std_err = stats.linregress(
+                daily_volumes['day_index'], daily_volumes['CRZ Entries'])
+            
+            # Calculate percent change per day
+            avg_volume = daily_volumes['CRZ Entries'].mean()
+            percent_change_per_day = (slope / avg_volume) * 100 if avg_volume > 0 else 0
+            
+            # Apply trend adjustment to forecast
+            days_to_forecast = (target_date - latest_date).days
+            trend_factor = 1 + (percent_change_per_day/100 * days_to_forecast)
+            trend_factor = max(0.5, min(1.5, trend_factor))  # Limit adjustment
+            
+            trend_description = f"Trend adjustment: {percent_change_per_day:.2f}% per day, applied for {days_to_forecast} days"
+    
+    # Calculate final forecast
+    forecast_volume = base_forecast * trend_factor
+    
+    # Calculate confidence interval (simple version)
+    std_dev = historical_df['CRZ Entries'].std()
+    confidence_interval = (
+        max(0, forecast_volume - 1.96 * std_dev),
+        forecast_volume + 1.96 * std_dev
+    )
+    
+    # Get peak info
+    peak_hour = hourly_pattern.idxmax() if not hourly_pattern.empty else None
+    peak_day = day_pattern.idxmax() if not day_pattern.empty else None
+    
+    # Identify key factors
+    key_factors = []
+    
+    # Check if target time is near peak hour
+    if peak_hour is not None and forecast_hour is not None:
+        if abs(forecast_hour - peak_hour) <= 1:
+            key_factors.append(f"Target hour ({forecast_hour}:00) is near peak hour ({peak_hour}:00)")
+    
+    # Check if target day is peak day
+    if peak_day is not None and target_day:
+        if target_day == peak_day:
+            key_factors.append(f"Target day ({target_day}) is typically the busiest day of the week")
+    
+    # Add trend factor if significant
+    if abs(trend_factor - 1.0) > 0.05:
+        direction = "upward" if trend_factor > 1 else "downward"
+        key_factors.append(f"Traffic shows a {direction} trend over the past {lookback_days} days")
+    
+    # Format the result
+    results = {
+        'forecast_volume': int(forecast_volume),
+        'confidence_interval': (int(confidence_interval[0]), int(confidence_interval[1])),
+        'historical_context': {
+            'avg_volume': int(base_forecast),
+            'peak_hour': int(peak_hour) if peak_hour is not None else None,
+            'peak_day': peak_day,
+            'data_points_used': len(historical_df)
+        },
+        'factors': key_factors,
+        'trend_analysis': trend_description,
+        'forecast_parameters': {
+            'target_date': target_date.strftime('%Y-%m-%d'),
+            'target_day': target_day,
+            'target_hour': target_hour if forecast_hour is not None else "All day",
+            'region': region if region else "All regions",
+            'entry_point': entry_point if entry_point else "All entry points",
+            'vehicle_class': vehicle_class if vehicle_class else "All vehicles",
+            'lookback_days': lookback_days
+        }
+    }
     
     return results

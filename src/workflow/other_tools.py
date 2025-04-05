@@ -1,6 +1,6 @@
 from typing import Type
-from src.models.schemas import FunctionParams
-from src.workflow.tools import filter_crz_data, analyze_entry_point_volume, analyze_peak_periods, analyze_vehicle_distribution, analyze_time_trends, analyze_excluded_roadway_usage, compare_traffic_segments
+from src.models.schemas import FunctionParams, dataset_parameters
+from src.workflow.tools import filter_crz_data, analyze_entry_point_volume, analyze_peak_periods, analyze_vehicle_distribution, analyze_time_trends, analyze_excluded_roadway_usage, compare_traffic_segments, analyze_regional_traffic_flow, forecast_congestion
 
 import pandas as pd
 from pydantic import BaseModel
@@ -27,7 +27,9 @@ def get_params_model(function_name: str) -> Type[BaseModel]:
         "analyze_excluded_roadway_usage": FunctionParams.AnalyzeExcludedRoadwayUsageParams,
         "analyze_vehicle_patterns": FunctionParams.AnalyzeVehiclePatternsParams,
         "compare_traffic_segments": FunctionParams.CompareTrafficSegmentsParams,
-        "generate_visualization": FunctionParams.GenerateVisualizationParams
+        "generate_visualization": FunctionParams.GenerateVisualizationParams,
+        "analyze_regional_traffic_flow": FunctionParams.AnalyzeRegionalTrafficFlowParams,
+        "forecast_congestion": FunctionParams.ForecastCongestionParams
     }
     
     if function_name not in model_mapping:
@@ -187,6 +189,8 @@ def execute_crz_function(function_name: str, params: BaseModel, df: pd.DataFrame
         "analyze_excluded_roadway_usage": analyze_excluded_roadway_usage,
         #"analyze_vehicle_patterns": analyze_vehicle_patterns,
         "compare_traffic_segments": compare_traffic_segments,
+        "analyze_regional_traffic_flow": analyze_regional_traffic_flow,
+        "forecast_congestion": forecast_congestion,
     }
     
     # Verify function exists
@@ -209,14 +213,53 @@ def execute_crz_function(function_name: str, params: BaseModel, df: pd.DataFrame
                 if key == 'hour_range' and isinstance(value, list):
                     params_dict['segment_b'][key] = tuple(value)
     
+    # Check if there are any parameters in params_dict that are not expected by func
+    import inspect
+    valid_params = set(inspect.signature(func).parameters.keys())
+    # 'df' is always a valid parameter
+    valid_params.add('df')
+    
+    # Filter out invalid parameters
+    filtered_params = {k: v for k, v in params_dict.items() if k in valid_params}
+    
+    # If parameters were filtered out, log it
+    if set(params_dict.keys()) != set(filtered_params.keys()):
+        removed_params = set(params_dict.keys()) - set(filtered_params.keys())
+        print(f"Warning: The following parameters are not accepted by {function_name} and will be ignored: {removed_params}")
+    
     # Call the function with the dataframe and parameters
     try:
         # Always pass the dataframe as the first argument
-        result = func(df, **params_dict)
+        result = func(df, **filtered_params)
         return result
     except TypeError as e:
         # If we get a TypeError, it might be due to unexpected parameters
         # Log the error and re-raise with more helpful message
         print(f"Error calling {function_name}: {e}")
-        print(f"Parameters provided: {params_dict}")
+        print(f"Parameters provided: {filtered_params}")
         raise ValueError(f"Error calling {function_name} with the provided parameters: {e}")
+    
+    
+def get_parameter_options(function_name):
+    """
+    Get parameter options for a specific function
+    
+    Parameters:
+    -----------
+    function_name : str
+        Name of the function to get parameter options for
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing parameter options for the specified function
+    """
+    # Get all parameters for the function
+    all_params = dataset_parameters.get(function_name, {})
+    
+    # If function not found, check if it's in the general_parameters
+    if not all_params and function_name not in dataset_parameters:
+        return {"error": f"Function {function_name} not found in parameters"}
+    
+    # Return parameters for the function
+    return all_params

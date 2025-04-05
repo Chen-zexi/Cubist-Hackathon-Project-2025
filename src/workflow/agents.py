@@ -3,7 +3,7 @@ import sys
 import os
 from src.models.schemas import Reception, FindFunction, FinalAnswer
 from src.llm.api_call import call_llm
-from src.workflow.other_tools import get_params_model, find_function_description
+from src.workflow.other_tools import get_params_model, find_function_description, get_parameter_options
 
 import json
 from typing import Any
@@ -69,6 +69,8 @@ def function_selection_agent(user_query: str, data_description: str, functions_i
 def data_retrieval_agent(user_query: str, function_name: str):
     functions_description = find_function_description(function_name)
     functions_description = json.dumps(functions_description)
+    parameter_options = get_parameter_options(function_name)
+    parameter_options = json.dumps(parameter_options)
     data_retrieval_template = ChatPromptTemplate.from_messages(
         [
             (
@@ -80,14 +82,15 @@ def data_retrieval_agent(user_query: str, function_name: str):
                 "human",
                 """You are given a task to retrieve data from NYC Congestion Relief Zone data. User is asking for {user_query} 
                 To answer the user's query, you need to retrieve data that is described as {functions_description}
-                You need to provide the parameters to pass to the function to retrieve the data.
+                You need to provide the parameters to pass to the function to retrieve the data. The avalible parameters are {parameter_options}
+                You should mapping the user's query to the avalible parameters, you may infer the parameter name from the user's query, but limit you choice to the avalible parameters.
                 response: The response to the user's query, in a concise and informative manner
                 function_params: the parameters to pass to the function to retrieve the data
                 """,
             ),
         ]
     )
-    prompt = data_retrieval_template.format(user_query=user_query, functions_description=functions_description)
+    prompt = data_retrieval_template.format(user_query=user_query, functions_description=functions_description, parameter_options=parameter_options)
     model_name = "gemini-2.0-flash"
     model_provider = "Gemini"
     pydantic_model = get_params_model(function_name)
